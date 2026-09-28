@@ -19,23 +19,37 @@ function switchTab(name) {
 }
 
 /* ---------- pipeline board ---------- */
+const STAGE_ICONS = {
+  wishlist: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>',
+  applied: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/></svg>',
+  interviewing: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
+  offer: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v6a5 5 0 0 1-10 0z"/><path d="M7 6H4a2 2 0 0 0 0 4h3"/><path d="M17 6h3a2 2 0 0 1 0 4h-3"/></svg>',
+  rejected: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6"/><path d="M9 9l6 6"/></svg>'
+};
 function renderBoard() {
   const box = document.getElementById("board");
-  const stats = stageStats(S.apps);
   box.innerHTML = STAGES.map(st => {
     const list = (S.apps || []).filter(a => a.stage === st);
-    return `<div class="col">
-      <h3>${STAGE_LABELS[st]} <span class="count">${list.length}</span></h3>
-      ${list.map(a => `
+    return `<div class="col" data-stage="${st}">
+      <h3><span class="stage-ic">${STAGE_ICONS[st] || ""}</span>${STAGE_LABELS[st]} <span class="count">${list.length}</span></h3>
+      ${list.map(a => {
+        const initial = esc((a.company || "?").trim().charAt(0).toUpperCase());
+        return `
         <div class="acard">
-          <b>${esc(a.company)}</b><div class="muted small">${esc(a.role)}</div>
-          <div class="muted small">Applied ${esc(a.dateApplied || "—")}</div>
+          <div class="strip-main">
+            <span class="avatar" aria-hidden="true">${initial}</span>
+            <div class="strip-id">
+              <b>${esc(a.company)}</b>
+              <div class="muted small">${esc(a.role)}</div>
+            </div>
+          </div>
+          <div class="strip-meta muted small">Applied ${esc(a.dateApplied || "—")}${a.salary ? ` · ${esc(a.salary)}` : ""}</div>
           <div class="rowbtns">
             ${STAGES.filter(s => s !== a.stage).map(s =>
-              `<button class="btn tiny" onclick="moveApp('${a.id}','${s}')">→ ${STAGE_LABELS[s].split(" ")[1] || s}</button>`).join("")}
+              `<button class="btn tiny" onclick="moveApp('${a.id}','${s}')" title="Move to ${STAGE_LABELS[s]}">→ ${STAGE_LABELS[s]}</button>`).join("")}
           </div>
           <button class="btn tiny ghost" onclick="editApp('${a.id}')">Details</button>
-        </div>`).join("") || `<p class="muted small">—</p>`}
+        </div>`; }).join("") || `<p class="muted small col-empty">No applications here yet.</p>`}
     </div>`;
   }).join("");
 }
@@ -131,13 +145,17 @@ function genLetter(e) {
     skillBank: SKILL_KEYWORDS, valueProps: VALUE_PROPS, tones: TONES
   });
   const out = document.getElementById("letterOut");
+  document.getElementById("letterEmpty").style.display = "none";
   out.style.display = "block";
   out.innerHTML = `
-    <div class="statcards">
-      <div class="stat"><div class="stat-num">${r.score}%</div><div class="stat-lab">Keyword match</div></div>
+    <div class="letter-head">
+      <div class="gauge" style="--g:${r.score}" role="img" aria-label="Keyword match ${r.score} percent"><span>${r.score}%</span></div>
+      <div>
+        <h3>Your cover letter</h3>
+        <p class="muted small">${r.keywords.length ? `Keyword match — detected: ${r.keywords.map(esc).join(", ")}` : "No known skill keywords found in the posting — the letter uses your background only."}</p>
+      </div>
       <div class="stat"><div class="stat-num">${r.keywords.length}</div><div class="stat-lab">Skills detected</div></div>
     </div>
-    ${r.keywords.length ? `<p class="muted small">Detected: ${r.keywords.map(esc).join(", ")}</p>` : `<p class="muted small">No known skill keywords found in the posting — the letter uses your background only.</p>`}
     <pre class="letter">${esc(r.letter)}</pre>
     <button class="btn small" onclick="copyLetter()">Copy letter</button>`;
 }
@@ -150,14 +168,22 @@ function copyLetter() {
 function renderStats() {
   const f = funnelStats(S.apps);
   const nudges = followUpNudges(S.apps, FOLLOWUP_AFTER_DAYS, todayISO());
+  const perStage = stageStats(S.apps);
+  const maxStage = Math.max(1, ...STAGES.map(s => perStage[s] || 0));
+  const funnel = STAGES.map(s => {
+    const n = perStage[s] || 0;
+    const w = Math.max(n > 0 ? 6 : 0, Math.round((n / maxStage) * 100));
+    return `<div class="funnel-row"><span class="funnel-lab">${STAGE_LABELS[s]}</span><div class="funnel-track"><i class="funnel-fill st-${s}" style="width:${w}%"></i></div><b class="funnel-num">${n}</b></div>`;
+  }).join("");
   document.getElementById("statsBox").innerHTML = `
-    ${nudges.length ? `<div class="nudge"><b>⏰ ${nudges.length} follow-up${nudges.length > 1 ? "s" : ""} due:</b><ul>${nudges.slice(0, 5).map(n => `<li>${esc(n.nudge)}</li>`).join("")}</ul></div>` : `<div class="nudge good">✅ No follow-ups overdue. Nice.</div>`}
+    ${nudges.length ? `<div class="nudge"><b>${nudges.length} follow-up${nudges.length > 1 ? "s" : ""} due:</b><ul>${nudges.slice(0, 5).map(n => `<li>${esc(n.nudge)}</li>`).join("")}</ul></div>` : `<div class="nudge good"><b>Follow-up radar clear.</b> No follow-ups overdue. Nice.</div>`}
     <div class="statcards">
       <div class="stat"><div class="stat-num">${f.total}</div><div class="stat-lab">Applications</div></div>
       <div class="stat"><div class="stat-num">${f.responseRate}%</div><div class="stat-lab">Response rate</div></div>
       <div class="stat"><div class="stat-num">${f.offers}</div><div class="stat-lab">Offers</div></div>
       <div class="stat"><div class="stat-num">${f.rejected}</div><div class="stat-lab">Rejections</div></div>
     </div>
+    <div class="funnel card"><h3>Pipeline funnel</h3>${funnel}</div>
     <p class="tip">Response rate = interviewing + offers ÷ everything you've actually applied to. Aim for 10–20%.</p>`;
 }
 

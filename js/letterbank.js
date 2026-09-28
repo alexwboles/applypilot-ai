@@ -4,7 +4,7 @@
 
 const TONES = {
   professional: {
-    label: "💼 Professional",
+    label: "Professional",
     openers: [
       "I am writing to apply for the {role} position at {company}.",
       "Please accept my application for the {role} role at {company}.",
@@ -17,7 +17,7 @@ const TONES = {
     ]
   },
   warm: {
-    label: "😊 Warm & personable",
+    label: "Warm & personable",
     openers: [
       "When I saw the {role} opening at {company}, it felt like a role written for me.",
       "I'm genuinely excited to apply for the {role} position at {company}.",
@@ -30,7 +30,7 @@ const TONES = {
     ]
   },
   bold: {
-    label: "⚡ Bold & confident",
+    label: "Bold & confident",
     openers: [
       "I don't just want the {role} job at {company} — I'm ready to excel at it from day one.",
       "{company} needs a {role} who delivers. That's exactly what I do.",
@@ -66,11 +66,11 @@ const SKILL_KEYWORDS = [
 
 const STAGES = ["wishlist", "applied", "interviewing", "offer", "rejected"];
 const STAGE_LABELS = {
-  wishlist: "💭 Wishlist",
-  applied: "📨 Applied",
-  interviewing: "🤝 Interviewing",
-  offer: "🎉 Offer",
-  rejected: "🚫 Rejected"
+  wishlist: "Wishlist",
+  applied: "Applied",
+  interviewing: "Interviewing",
+  offer: "Offer",
+  rejected: "Rejected"
 };
 
 const FOLLOWUP_AFTER_DAYS = 7;

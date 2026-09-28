@@ -7,58 +7,85 @@
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-<header>
-  <div class="wrap">
-    <h1>ApplyPilot AI</h1>
-    <p class="tag">The job-seeker's copilot: application pipeline, tailored cover letters in 3 tones, follow-up nudges, and response-rate stats. All local, nothing leaves your browser.</p>
+<header class="topbar">
+  <div class="wrap topbar-inner">
+    <div class="brand">
+      <span class="mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5c.8-.8.8-2 0-2.8-.8-.8-2-.8-2.8 0L13 8 4.8 6.2c-.5-.1-.9.2-1 .7l-.1.2c-.1.5.1 1 .6 1.2L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.7 4.7c.2.5.7.7 1.2.6l.2-.1c.5-.1.8-.5.7-1z"/></svg>
+      </span>
+      <span class="brand-name">ApplyPilot <em>AI</em></span>
+    </div>
+    <p class="tag">Your job-search flight deck — pipeline, tailored cover letters, follow-up radar. All local, nothing leaves your browser.</p>
+    <span class="local-pill"><i></i>Local only</span>
   </div>
 </header>
 
 <div class="wrap">
-  <nav class="tabs">
+  <nav class="tabs" aria-label="Sections">
     <button class="tab active" data-tab="board">Pipeline</button>
     <button class="tab" data-tab="letter">Cover letter</button>
     <button class="tab" data-tab="stats">Stats</button>
   </nav>
 
   <section class="panel active" id="panel-board">
-    <h2>Application pipeline</h2>
-    <form id="addForm" class="form inline">
-      <input id="fCompany" placeholder="Company" required>
-      <input id="fRole" placeholder="Role" required>
-      <select id="fStage"></select>
-      <input id="fDate" type="date">
-      <input id="fContact" placeholder="Contact (optional)">
-      <input id="fLink" placeholder="Listing URL (optional)">
-      <input id="fSalary" placeholder="Salary range (optional)">
-      <input id="fNotes" placeholder="Notes (optional)">
-      <button class="btn small" type="submit">Add application</button>
+    <div class="panel-head">
+      <div>
+        <h2>Application pipeline</h2>
+        <p class="muted">File a new application, then advance it down the runway as it moves.</p>
+      </div>
+    </div>
+    <form id="addForm" class="form addform">
+      <input id="fCompany" placeholder="Company" required aria-label="Company">
+      <input id="fRole" placeholder="Role" required aria-label="Role">
+      <select id="fStage" aria-label="Stage"></select>
+      <input id="fDate" type="date" aria-label="Date applied">
+      <input id="fContact" placeholder="Contact (optional)" aria-label="Contact">
+      <input id="fLink" placeholder="Listing URL (optional)" aria-label="Listing URL">
+      <input id="fSalary" placeholder="Salary range (optional)" aria-label="Salary range">
+      <input id="fNotes" placeholder="Notes (optional)" aria-label="Notes">
+      <button class="btn primary" type="submit">Add application</button>
     </form>
     <div id="board" class="board"></div>
-    <div id="detailBox" class="card" style="display:none"></div>
+    <div id="detailBox" class="card dossier" style="display:none"></div>
   </section>
 
   <section class="panel" id="panel-letter">
-    <h2>Cover letter writer</h2>
-    <p class="muted">Tell it about you once, paste any job description, pick a tone — get a tailored letter with a keyword-match score.</p>
-    <form id="letterForm" class="form">
-      <div class="form inline">
-        <input id="pName" placeholder="Your name">
-        <select id="lTone"></select>
+    <div class="panel-head">
+      <div>
+        <h2>Cover letter writer</h2>
+        <p class="muted">Tell it about you once, paste any job description, pick a tone — get a tailored letter with a keyword-match score.</p>
       </div>
-      <textarea id="pBg" placeholder="Your background in 2–4 sentences (e.g. '5 years in customer support, led a team of 6, fluent in Spanish…')"></textarea>
-      <div class="form inline">
-        <input id="lCompany" placeholder="Company">
-        <input id="lRole" placeholder="Role">
+    </div>
+    <div class="letter-grid">
+      <form id="letterForm" class="form">
+        <div class="form inline">
+          <input id="pName" placeholder="Your name" aria-label="Your name">
+          <select id="lTone" aria-label="Tone"></select>
+        </div>
+        <textarea id="pBg" placeholder="Your background in 2–4 sentences (e.g. '5 years in customer support, led a team of 6, fluent in Spanish…')" aria-label="Your background"></textarea>
+        <div class="form inline">
+          <input id="lCompany" placeholder="Company" aria-label="Company">
+          <input id="lRole" placeholder="Role" aria-label="Role">
+        </div>
+        <textarea id="lJobDesc" placeholder="Paste the job description here…" aria-label="Job description"></textarea>
+        <button class="btn primary" type="submit">Generate cover letter</button>
+      </form>
+      <div id="letterEmpty" class="card lettersheet empty">
+        <div class="empty-mark" aria-hidden="true">✒</div>
+        <h3>Your tailored letter lands here</h3>
+        <p class="muted small">Tell it about you, paste the job posting, pick a tone — then press “Generate cover letter”.</p>
       </div>
-      <textarea id="lJobDesc" placeholder="Paste the job description here…"></textarea>
-      <button class="btn" type="submit">Generate cover letter</button>
-    </form>
-    <div id="letterOut" class="card" style="display:none"></div>
+      <div id="letterOut" class="card lettersheet" style="display:none"></div>
+    </div>
   </section>
 
   <section class="panel" id="panel-stats">
-    <h2>Your numbers</h2>
+    <div class="panel-head">
+      <div>
+        <h2>Your numbers</h2>
+        <p class="muted">Response rate, funnel, and follow-up radar — the instruments that matter.</p>
+      </div>
+    </div>
     <div id="statsBox"></div>
   </section>
 
