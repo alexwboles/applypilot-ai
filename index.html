@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ApplyPilot AI — track applications, write better cover letters</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>✈️ ApplyPilot AI</h1>
+    <p class="tag">The job-seeker's copilot: application pipeline, tailored cover letters in 3 tones, follow-up nudges, and response-rate stats. All local, nothing leaves your browser.</p>
+  </div>
+</header>
+
+<div class="wrap">
+  <nav class="tabs">
+    <button class="tab active" data-tab="board">📋 Pipeline</button>
+    <button class="tab" data-tab="letter">✍️ Cover letter</button>
+    <button class="tab" data-tab="stats">📊 Stats</button>
+  </nav>
+
+  <section class="panel active" id="panel-board">
+    <h2>Application pipeline</h2>
+    <form id="addForm" class="form inline">
+      <input id="fCompany" placeholder="Company" required>
+      <input id="fRole" placeholder="Role" required>
+      <select id="fStage"></select>
+      <input id="fDate" type="date">
+      <input id="fContact" placeholder="Contact (optional)">
+      <input id="fLink" placeholder="Listing URL (optional)">
+      <input id="fSalary" placeholder="Salary range (optional)">
+      <input id="fNotes" placeholder="Notes (optional)">
+      <button class="btn small" type="submit">Add application</button>
+    </form>
+    <div id="board" class="board"></div>
+    <div id="detailBox" class="card" style="display:none"></div>
+  </section>
+
+  <section class="panel" id="panel-letter">
+    <h2>Cover letter writer</h2>
+    <p class="muted">Tell it about you once, paste any job description, pick a tone — get a tailored letter with a keyword-match score.</p>
+    <form id="letterForm" class="form">
+      <div class="form inline">
+        <input id="pName" placeholder="Your name">
+        <select id="lTone"></select>
+      </div>
+      <textarea id="pBg" placeholder="Your background in 2–4 sentences (e.g. '5 years in customer support, led a team of 6, fluent in Spanish…')"></textarea>
+      <div class="form inline">
+        <input id="lCompany" placeholder="Company">
+        <input id="lRole" placeholder="Role">
+      </div>
+      <textarea id="lJobDesc" placeholder="Paste the job description here…"></textarea>
+      <button class="btn" type="submit">Generate cover letter</button>
+    </form>
+    <div id="letterOut" class="card" style="display:none"></div>
+  </section>
+
+  <section class="panel" id="panel-stats">
+    <h2>Your numbers</h2>
+    <div id="statsBox"></div>
+  </section>
+
+  <footer class="foot">
+    <p class="muted small">ApplyPilot AI runs 100% in your browser. Data lives in <code>localStorage</code> (<code>applypilot.v1</code>). Letters are template-assembled locally — always proofread before sending.</p>
+  </footer>
+</div>
+
+<script src="js/letterbank.js"></script>
+<script src="js/logic.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
