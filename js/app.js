@@ -87,7 +87,7 @@ function editApp(id) {
       <label class="check"><input type="checkbox" id="dFollow" ${a.followUpDone ? "checked" : ""}> Follow-up sent</label>
       <div class="rowbtns">
         <button class="btn small" onclick="saveDetail()">Save</button>
-        <button class="btn small" onclick="useForLetter('${a.id}')">✍️ Write cover letter</button>
+        <button class="btn small" onclick="useForLetter('${a.id}')">Write cover letter</button>
         <button class="btn danger small" onclick="delApp()">Delete</button>
       </div>
     </div>`;
@@ -139,7 +139,7 @@ function genLetter(e) {
     </div>
     ${r.keywords.length ? `<p class="muted small">Detected: ${r.keywords.map(esc).join(", ")}</p>` : `<p class="muted small">No known skill keywords found in the posting — the letter uses your background only.</p>`}
     <pre class="letter">${esc(r.letter)}</pre>
-    <button class="btn small" onclick="copyLetter()">📋 Copy letter</button>`;
+    <button class="btn small" onclick="copyLetter()">Copy letter</button>`;
 }
 function copyLetter() {
   const t = document.querySelector("#letterOut .letter").innerText;
