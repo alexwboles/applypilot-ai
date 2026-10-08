@@ -33,12 +33,17 @@
         <h2>Application pipeline</h2>
         <p class="muted">File a new application, then advance it down the runway as it moves.</p>
       </div>
+      <div class="board-tools">
+        <input id="boardSearch" placeholder="Search company, role, contact…" aria-label="Search applications" autocomplete="off">
+        <button class="btn small ghost" id="exportCsv">Export CSV</button>
+      </div>
     </div>
     <form id="addForm" class="form addform">
       <input id="fCompany" placeholder="Company" required aria-label="Company">
       <input id="fRole" placeholder="Role" required aria-label="Role">
       <select id="fStage" aria-label="Stage"></select>
       <input id="fDate" type="date" aria-label="Date applied">
+      <input id="fDeadline" type="date" aria-label="Next deadline (optional)">
       <input id="fContact" placeholder="Contact (optional)" aria-label="Contact">
       <input id="fLink" placeholder="Listing URL (optional)" aria-label="Listing URL">
       <input id="fSalary" placeholder="Salary range (optional)" aria-label="Salary range">

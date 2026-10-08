@@ -36,6 +36,41 @@ check "funnel stats math" node -e "
   const f=L.funnelStats([{stage:'applied'},{stage:'interviewing'},{stage:'offer'},{stage:'rejected'},{stage:'wishlist'}]);
   if(f.responseRate!==50) throw new Error('rr='+f.responseRate);
   if(f.offers!==1) throw new Error('offers');"
+check "appsToCSV exports header + rows with quoting" node -e "
+  const L=require('./js/logic.js');
+  const csv=L.appsToCSV([{company:'Acme, Inc.',role:'Eng',stage:'applied',dateApplied:'2026-10-01',deadline:'2026-10-15',contact:'',link:'',salary:'\$90k',followUpDone:false,notes:'a \"great\" fit'}]);
+  const lines=csv.split('\n');
+  if(lines.length!==2) throw new Error('lines='+lines.length);
+  if(!lines[0].startsWith('company,role,stage')) throw new Error('header');
+  if(!lines[1].includes('\"Acme, Inc.\"')) throw new Error('company quoting: '+lines[1]);
+  if(!lines[1].includes('2026-10-15')) throw new Error('deadline missing');"
+check "upcomingDeadlines sorts soonest-first, flags overdue" node -e "
+  const L=require('./js/logic.js');
+  const d=L.upcomingDeadlines([
+    {company:'Late',deadline:'2026-09-20'},
+    {company:'Soon',deadline:'2026-10-02'},
+    {company:'Far',deadline:'2027-06-01'},
+    {company:'None'}
+  ],30,'2026-10-01');
+  if(d.length!==2) throw new Error('count='+d.length);
+  if(d[0].app.company!=='Late'||!d[0].overdue||d[0].daysLeft!==-11) throw new Error('overdue wrong');
+  if(d[1].app.company!=='Soon'||d[1].overdue||d[1].daysLeft!==1) throw new Error('soon wrong');"
+check "searchApps filters by company/role/contact" node -e "
+  const L=require('./js/logic.js');
+  const apps=[{company:'Acme',role:'Engineer',contact:'jane@x.io',notes:''},
+              {company:'Globex',role:'Designer',contact:'',notes:'referral'}];
+  if(L.searchApps(apps,'acme').length!==1) throw new Error('company');
+  if(L.searchApps(apps,'DESIGNER').length!==1) throw new Error('role case');
+  if(L.searchApps(apps,'referral').length!==1) throw new Error('notes');
+  if(L.searchApps(apps,'').length!==2) throw new Error('empty query');
+  if(L.searchApps(apps,'zzz').length!==0) throw new Error('no match');"
+check "index.html has search, export, deadline controls" node -e "
+  const fs=require('fs'), h=fs.readFileSync('index.html','utf8');
+  for (const id of ['boardSearch','exportCsv','fDeadline']) if(!h.includes('id=\"'+id+'\"')) throw new Error('missing '+id);
+  const a=fs.readFileSync('js/app.js','utf8');
+  if(!a.includes('id=\"dDeadline\"')) throw new Error('missing dDeadline');
+  if(!a.includes('upcomingDeadlines(S.apps')) throw new Error('deadlines not rendered');
+  if(!a.includes('searchApps(S.apps, boardQuery)')) throw new Error('search not wired');"
 
 echo "--- smoke: $pass passed, $fail failed ---"
 exit $((fail>0))

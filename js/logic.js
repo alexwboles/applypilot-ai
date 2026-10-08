@@ -105,7 +105,54 @@ function generateCoverLetter(opts) {
   return { letter: paras.join("\n\n") + sig, keywords, score: matchScore(keywords, o.background) };
 }
 
+/**
+ * Upcoming deadlines: applications with a deadline date set, optionally
+ * including overdue ones. Sorted soonest first.
+ * Each item: { app, daysLeft (negative = overdue), overdue }.
+ */
+function upcomingDeadlines(apps, daysAhead, fromISO) {
+  const now = fromISO || todayISO();
+  const ahead = daysAhead == null ? 30 : daysAhead;
+  return (apps || [])
+    .filter(a => a.deadline && /^\d{4}-\d{2}-\d{2}$/.test(a.deadline))
+    .map(a => {
+      const daysLeft = daysBetween(now, a.deadline);
+      return { app: a, daysLeft, overdue: daysLeft < 0 };
+    })
+    .filter(x => x.overdue || x.daysLeft <= ahead)
+    .sort((a, b) => a.daysLeft - b.daysLeft);
+}
+
+function csvCell(v) {
+  const s = String(v == null ? "" : v).replace(/\r?\n/g, " ");
+  return /[",]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+/** Export the pipeline as CSV: one row per application. */
+function appsToCSV(apps) {
+  const rows = [["company", "role", "stage", "date_applied", "deadline",
+    "contact", "link", "salary", "follow_up_sent", "notes"]];
+  (apps || []).forEach(a => {
+    rows.push([
+      a.company || "", a.role || "", a.stage || "", a.dateApplied || "",
+      a.deadline || "", a.contact || "", a.link || "", a.salary || "",
+      a.followUpDone ? "yes" : "no", a.notes || ""
+    ]);
+  });
+  return rows.map(r => r.map(csvCell).join(",")).join("\n");
+}
+
+/** Match apps against a search query (company, role, contact, notes). */
+function searchApps(apps, query) {
+  const q = String(query || "").trim().toLowerCase();
+  if (!q) return apps || [];
+  return (apps || []).filter(a =>
+    [a.company, a.role, a.contact, a.notes].some(
+      f => String(f || "").toLowerCase().includes(q)));
+}
+
 if (typeof module !== "undefined" && module.exports) {
   module.exports = { parseISO, toISO, todayISO, daysBetween, stageStats, funnelStats,
-    followUpNudges, extractKeywords, matchScore, generateCoverLetter };
+    followUpNudges, extractKeywords, matchScore, generateCoverLetter,
+    upcomingDeadlines, appsToCSV, searchApps };
 }

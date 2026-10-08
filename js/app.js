@@ -12,6 +12,7 @@ function uid() { return "a" + Date.now().toString(36) + Math.floor(Math.random()
 function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 
 let S = load();
+let boardQuery = "";
 function persist() { save(S); render(); }
 function switchTab(name) {
   document.querySelectorAll(".tab").forEach(b => b.classList.toggle("active", b.dataset.tab === name));
@@ -28,12 +29,19 @@ const STAGE_ICONS = {
 };
 function renderBoard() {
   const box = document.getElementById("board");
+  const visible = searchApps(S.apps, boardQuery);
   box.innerHTML = STAGES.map(st => {
-    const list = (S.apps || []).filter(a => a.stage === st);
+    const list = visible.filter(a => a.stage === st);
+    const total = (S.apps || []).filter(a => a.stage === st).length;
+    const countLabel = boardQuery ? `${list.length} of ${total}` : `${total}`;
     return `<div class="col" data-stage="${st}">
-      <h3><span class="stage-ic">${STAGE_ICONS[st] || ""}</span>${STAGE_LABELS[st]} <span class="count">${list.length}</span></h3>
+      <h3><span class="stage-ic">${STAGE_ICONS[st] || ""}</span>${STAGE_LABELS[st]} <span class="count">${countLabel}</span></h3>
       ${list.map(a => {
         const initial = esc((a.company || "?").trim().charAt(0).toUpperCase());
+        const waiting = a.stage === "applied" && a.dateApplied
+          ? ` · <span class="wait">${daysBetween(a.dateApplied, todayISO())}d waiting</span>` : "";
+        const due = a.deadline
+          ? ` · <span class="due">due ${esc(a.deadline)}</span>` : "";
         return `
         <div class="acard">
           <div class="strip-main">
@@ -43,13 +51,13 @@ function renderBoard() {
               <div class="muted small">${esc(a.role)}</div>
             </div>
           </div>
-          <div class="strip-meta muted small">Applied ${esc(a.dateApplied || "—")}${a.salary ? ` · ${esc(a.salary)}` : ""}</div>
+          <div class="strip-meta muted small">Applied ${esc(a.dateApplied || "—")}${waiting}${due}${a.salary ? ` · ${esc(a.salary)}` : ""}</div>
           <div class="rowbtns">
             ${STAGES.filter(s => s !== a.stage).map(s =>
               `<button class="btn tiny" onclick="moveApp('${a.id}','${s}')" title="Move to ${STAGE_LABELS[s]}">→ ${STAGE_LABELS[s]}</button>`).join("")}
           </div>
           <button class="btn tiny ghost" onclick="editApp('${a.id}')">Details</button>
-        </div>`; }).join("") || `<p class="muted small col-empty">No applications here yet.</p>`}
+        </div>`; }).join("") || `<p class="muted small col-empty">${boardQuery ? "No matches for this search." : "No applications here yet."}</p>`}
     </div>`;
   }).join("");
 }
@@ -63,6 +71,31 @@ function delApp() {
   document.getElementById("detailBox").style.display = "none";
   persist();
 }
+function dupApp(id) {
+  const a = S.apps.find(x => x.id === id); if (!a) return;
+  S.apps.push({
+    id: uid(),
+    company: a.company, role: a.role,
+    stage: "wishlist",
+    dateApplied: todayISO(),
+    deadline: a.deadline || "",
+    contact: a.contact || "", link: a.link || "", salary: a.salary || "",
+    notes: a.notes || "", jobDesc: a.jobDesc || "", followUpDone: false
+  });
+  document.getElementById("detailBox").style.display = "none";
+  persist();
+}
+function exportCsv() {
+  const csv = appsToCSV(S.apps);
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "applypilot-applications.csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
 
 /* ---------- add / edit ---------- */
 function addApp(e) {
@@ -74,6 +107,7 @@ function addApp(e) {
     id: uid(), company, role,
     stage: document.getElementById("fStage").value,
     dateApplied: document.getElementById("fDate").value || todayISO(),
+    deadline: document.getElementById("fDeadline").value || "",
     contact: document.getElementById("fContact").value.trim(),
     link: document.getElementById("fLink").value.trim(),
     salary: document.getElementById("fSalary").value.trim(),
@@ -95,6 +129,7 @@ function editApp(id) {
       <label>Contact <input id="dContact" value="${esc(a.contact || "")}" placeholder="Hiring manager, email…"></label>
       <label>Listing link <input id="dLink" value="${esc(a.link || "")}"></label>
       <label>Salary range <input id="dSalary" value="${esc(a.salary || "")}" placeholder="$90k–$110k"></label>
+      <label>Next deadline <input id="dDeadline" type="date" value="${esc(a.deadline || "")}"></label>
       <label>Job description (paste — powers the cover letter + keyword match)
         <textarea id="dJobDesc" placeholder="Paste the job posting here…">${esc(a.jobDesc || "")}</textarea></label>
       <label>Notes <textarea id="dNotes" placeholder="Interview dates, impressions…">${esc(a.notes || "")}</textarea></label>
@@ -102,6 +137,7 @@ function editApp(id) {
       <div class="rowbtns">
         <button class="btn small" onclick="saveDetail()">Save</button>
         <button class="btn small" onclick="useForLetter('${a.id}')">Write cover letter</button>
+        <button class="btn small ghost" onclick="dupApp('${a.id}')">Duplicate</button>
         <button class="btn danger small" onclick="delApp()">Delete</button>
       </div>
     </div>`;
@@ -113,6 +149,7 @@ function saveDetail() {
   a.contact = document.getElementById("dContact").value.trim();
   a.link = document.getElementById("dLink").value.trim();
   a.salary = document.getElementById("dSalary").value.trim();
+  a.deadline = document.getElementById("dDeadline").value || "";
   a.jobDesc = document.getElementById("dJobDesc").value;
   a.notes = document.getElementById("dNotes").value;
   a.followUpDone = document.getElementById("dFollow").checked;
@@ -169,14 +206,21 @@ function renderStats() {
   const f = funnelStats(S.apps);
   const nudges = followUpNudges(S.apps, FOLLOWUP_AFTER_DAYS, todayISO());
   const perStage = stageStats(S.apps);
+  const deadlines = upcomingDeadlines(S.apps, 30, todayISO());
   const maxStage = Math.max(1, ...STAGES.map(s => perStage[s] || 0));
   const funnel = STAGES.map(s => {
     const n = perStage[s] || 0;
     const w = Math.max(n > 0 ? 6 : 0, Math.round((n / maxStage) * 100));
     return `<div class="funnel-row"><span class="funnel-lab">${STAGE_LABELS[s]}</span><div class="funnel-track"><i class="funnel-fill st-${s}" style="width:${w}%"></i></div><b class="funnel-num">${n}</b></div>`;
   }).join("");
+  const deadlineRows = deadlines.length
+    ? `<div class="funnel card"><h3>Upcoming deadlines</h3><ul class="deadlines">${
+        deadlines.map(d => `<li class="${d.overdue ? "overdue" : ""}"><b>${esc(d.app.company)}</b> — ${esc(d.app.role)}: <span>${d.overdue ? "overdue by " + Math.abs(d.daysLeft) + "d" : "in " + d.daysLeft + "d"}</span> <em>${esc(d.app.deadline)}</em></li>`).join("")
+      }</ul></div>`
+    : `<div class="funnel card"><h3>Upcoming deadlines</h3><p class="muted small">No deadlines set. Add one on any application — interview dates, decision windows, offer expirations.</p></div>`;
   document.getElementById("statsBox").innerHTML = `
     ${nudges.length ? `<div class="nudge"><b>${nudges.length} follow-up${nudges.length > 1 ? "s" : ""} due:</b><ul>${nudges.slice(0, 5).map(n => `<li>${esc(n.nudge)}</li>`).join("")}</ul></div>` : `<div class="nudge good"><b>Follow-up radar clear.</b> No follow-ups overdue. Nice.</div>`}
+    ${deadlineRows}
     <div class="statcards">
       <div class="stat"><div class="stat-num">${f.total}</div><div class="stat-lab">Applications</div></div>
       <div class="stat"><div class="stat-num">${f.responseRate}%</div><div class="stat-lab">Response rate</div></div>
@@ -202,6 +246,11 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("pBg").value = S.profile.background || "";
   document.getElementById("addForm").addEventListener("submit", addApp);
   document.getElementById("letterForm").addEventListener("submit", genLetter);
+  document.getElementById("boardSearch").addEventListener("input", e => {
+    boardQuery = e.target.value;
+    renderBoard();
+  });
+  document.getElementById("exportCsv").addEventListener("click", exportCsv);
   document.querySelectorAll(".tab").forEach(b => b.addEventListener("click", () => switchTab(b.dataset.tab)));
   render();
 });

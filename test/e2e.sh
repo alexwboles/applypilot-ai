@@ -63,5 +63,44 @@ flow "letter handles empty job description gracefully" "
   if(r.keywords.length!==0) throw new Error('keywords should be empty');
 "
 
+flow "deadlines: soonest first, overdue flagged, far ones dropped" "
+  const L=require('./js/logic.js');
+  const d=L.upcomingDeadlines([
+    {id:'1',company:'A',deadline:'2026-09-28'},
+    {id:'2',company:'B',deadline:'2026-10-03'},
+    {id:'3',company:'C',deadline:'2027-01-01'},
+    {id:'4',company:'D',deadline:'not-a-date'}
+  ],30,'2026-10-01');
+  if(d.length!==2) throw new Error('expected 2, got '+d.length);
+  if(d[0].app.id!=='1'||d[0].daysLeft!==-3||!d[0].overdue) throw new Error('first should be overdue A');
+  if(d[1].app.id!=='2'||d[1].daysLeft!==2||d[1].overdue) throw new Error('second should be B');
+"
+
+flow "CSV export round-trips every application field" "
+  const L=require('./js/logic.js');
+  const apps=[
+    {company:'Acme',role:'Eng',stage:'applied',dateApplied:'2026-10-01',deadline:'2026-10-20',contact:'a@x.io',link:'http://x',salary:'\$100k',followUpDone:true,notes:'line1\nline2'},
+    {company:'Globex',role:'Designer',stage:'wishlist',dateApplied:'2026-09-01',deadline:'',contact:'',link:'',salary:'',followUpDone:false,notes:''}
+  ];
+  const lines=L.appsToCSV(apps).split('\n');
+  if(lines.length!==3) throw new Error('lines='+lines.length);
+  const r1=lines[1];
+  if(!r1.includes('Acme')||!r1.includes('2026-10-20')||!r1.includes('yes')) throw new Error('fields: '+r1);
+  if(!r1.includes('line1 line2')) throw new Error('newline not flattened');
+  if(!lines[2].endsWith(',no,')) throw new Error('followup no: '+lines[2]);
+"
+
+flow "searchApps narrows the board by any text field" "
+  const L=require('./js/logic.js');
+  const apps=[
+    {company:'Acme Corp',role:'Engineer',contact:'',notes:''},
+    {company:'Globex',role:'Designer',contact:'Jane Smith',notes:''},
+    {company:'Initech',role:'PM',contact:'',notes:'ex-Acme intern'}
+  ];
+  if(L.searchApps(apps,'acme').length!==2) throw new Error('acme should hit company+notes');
+  if(L.searchApps(apps,'jane').length!==1) throw new Error('contact');
+  if(L.searchApps(apps,'   ').length!==3) throw new Error('blank = all');
+"
+
 echo "--- e2e: $pass passed, $fail failed ---"
 exit $((fail>0))
