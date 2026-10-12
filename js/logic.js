@@ -123,6 +123,69 @@ function upcomingDeadlines(apps, daysAhead, fromISO) {
     .sort((a, b) => a.daysLeft - b.daysLeft);
 }
 
+/**
+ * Post-interview thank-you note. Deterministic template assembly (no network).
+ * opts: { name, interviewer, company, role, tone, thankyou }.
+ * Returns { note, tone }.
+ */
+function generateThankYou(opts) {
+  const o = opts || {};
+  const bank = o.thankyou || {};
+  const toneKey = bank.openers && bank.openers[o.tone] ? o.tone : "professional";
+  const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+  const fill = s => String(s)
+    .replace("{role}", o.role || "the role")
+    .replace("{company}", o.company || "your company")
+    .replace("{interviewer}", (o.interviewer || "").trim() || "there");
+  const openers = (bank.openers && bank.openers[toneKey]) || [""];
+  const bodies = bank.bodies || [""];
+  const closers = (bank.closers && bank.closers[toneKey]) || [""];
+  const who = (o.interviewer || "").trim();
+  const greet = who ? "Dear " + who + "," : "Hello,";
+  const sig = o.name ? "\n\nBest regards,\n" + o.name : "";
+  return {
+    note: greet + "\n\n" + fill(pick(openers)) + "\n\n" + fill(pick(bodies)) + "\n\n" + fill(pick(closers)) + sig,
+    tone: toneKey
+  };
+}
+
+/**
+ * Upcoming interviews: applications with interviewAt set ("YYYY-MM-DDTHH:mm").
+ * Each item: { app, at (Date), hoursLeft (negative = overdue), overdue }.
+ * Sorted soonest first; `nowMs` is injectable for tests.
+ */
+function upcomingInterviews(apps, daysAhead, nowMs) {
+  const now = nowMs != null ? nowMs : Date.now();
+  const ahead = daysAhead == null ? 14 : daysAhead;
+  return (apps || [])
+    .filter(a => a.interviewAt && !isNaN(new Date(a.interviewAt).getTime()))
+    .map(a => {
+      const at = new Date(a.interviewAt);
+      const hoursLeft = (at.getTime() - now) / 3600000;
+      return { app: a, at, hoursLeft, overdue: hoursLeft < 0 };
+    })
+    .filter(x => x.overdue || x.hoursLeft <= ahead * 24)
+    .sort((a, b) => a.hoursLeft - b.hoursLeft);
+}
+
+/** Human countdown: "in 2d 5h", "in 3h", "in 20m", or "overdue". */
+function fmtCountdown(hoursLeft) {
+  if (hoursLeft == null || isNaN(hoursLeft)) return "—";
+  if (hoursLeft < 0) return "overdue";
+  const d = Math.floor(hoursLeft / 24), h = Math.floor(hoursLeft % 24);
+  if (d > 0) return "in " + d + "d " + h + "h";
+  if (hoursLeft >= 1) return "in " + Math.floor(hoursLeft) + "h";
+  return "in " + Math.max(1, Math.round(hoursLeft * 60)) + "m";
+}
+
+/** Append a timestamped entry to an application's activity timeline. */
+function logActivity(app, text, tsISO) {
+  if (!app || !String(text || "").trim()) return app;
+  app.activity = app.activity || [];
+  app.activity.push({ ts: tsISO || new Date().toISOString(), text: String(text).trim() });
+  return app;
+}
+
 function csvCell(v) {
   const s = String(v == null ? "" : v).replace(/\r?\n/g, " ");
   return /[",]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
@@ -154,5 +217,6 @@ function searchApps(apps, query) {
 if (typeof module !== "undefined" && module.exports) {
   module.exports = { parseISO, toISO, todayISO, daysBetween, stageStats, funnelStats,
     followUpNudges, extractKeywords, matchScore, generateCoverLetter,
+    generateThankYou, upcomingInterviews, fmtCountdown, logActivity,
     upcomingDeadlines, appsToCSV, searchApps };
 }

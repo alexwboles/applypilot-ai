@@ -30,6 +30,8 @@ const STAGE_ICONS = {
 function renderBoard() {
   const box = document.getElementById("board");
   const visible = searchApps(S.apps, boardQuery);
+  const ivById = {};
+  upcomingInterviews(S.apps, 14).forEach(x => { ivById[x.app.id] = x; });
   box.innerHTML = STAGES.map(st => {
     const list = visible.filter(a => a.stage === st);
     const total = (S.apps || []).filter(a => a.stage === st).length;
@@ -42,6 +44,9 @@ function renderBoard() {
           ? ` · <span class="wait">${daysBetween(a.dateApplied, todayISO())}d waiting</span>` : "";
         const due = a.deadline
           ? ` · <span class="due">due ${esc(a.deadline)}</span>` : "";
+        const iv = ivById[a.id];
+        const ivBadge = iv
+          ? ` · <span class="due${iv.overdue ? " overdue" : ""}">interview ${esc(fmtCountdown(iv.hoursLeft))}</span>` : "";
         return `
         <div class="acard">
           <div class="strip-main">
@@ -51,7 +56,7 @@ function renderBoard() {
               <div class="muted small">${esc(a.role)}</div>
             </div>
           </div>
-          <div class="strip-meta muted small">Applied ${esc(a.dateApplied || "—")}${waiting}${due}${a.salary ? ` · ${esc(a.salary)}` : ""}</div>
+          <div class="strip-meta muted small">Applied ${esc(a.dateApplied || "—")}${waiting}${due}${ivBadge}${a.salary ? ` · ${esc(a.salary)}` : ""}</div>
           <div class="rowbtns">
             ${STAGES.filter(s => s !== a.stage).map(s =>
               `<button class="btn tiny" onclick="moveApp('${a.id}','${s}')" title="Move to ${STAGE_LABELS[s]}">→ ${STAGE_LABELS[s]}</button>`).join("")}
@@ -63,7 +68,9 @@ function renderBoard() {
 }
 function moveApp(id, stage) {
   const a = S.apps.find(x => x.id === id); if (!a) return;
-  a.stage = stage; persist();
+  a.stage = stage;
+  logActivity(a, "Moved to " + (STAGE_LABELS[stage] || stage));
+  persist();
 }
 function delApp() {
   const id = document.getElementById("dId").value;
@@ -80,7 +87,8 @@ function dupApp(id) {
     dateApplied: todayISO(),
     deadline: a.deadline || "",
     contact: a.contact || "", link: a.link || "", salary: a.salary || "",
-    notes: a.notes || "", jobDesc: a.jobDesc || "", followUpDone: false
+    notes: a.notes || "", jobDesc: a.jobDesc || "", followUpDone: false,
+    interviewAt: "", activity: []
   });
   document.getElementById("detailBox").style.display = "none";
   persist();
@@ -112,7 +120,7 @@ function addApp(e) {
     link: document.getElementById("fLink").value.trim(),
     salary: document.getElementById("fSalary").value.trim(),
     notes: document.getElementById("fNotes").value.trim(),
-    jobDesc: "", followUpDone: false
+    jobDesc: "", followUpDone: false, interviewAt: "", activity: []
   });
   e.target.reset();
   document.getElementById("fDate").value = todayISO();
@@ -130,10 +138,19 @@ function editApp(id) {
       <label>Listing link <input id="dLink" value="${esc(a.link || "")}"></label>
       <label>Salary range <input id="dSalary" value="${esc(a.salary || "")}" placeholder="$90k–$110k"></label>
       <label>Next deadline <input id="dDeadline" type="date" value="${esc(a.deadline || "")}"></label>
+      <label>Interview date &amp; time <input id="dInterview" type="datetime-local" value="${esc(a.interviewAt || "")}"></label>
       <label>Job description (paste — powers the cover letter + keyword match)
         <textarea id="dJobDesc" placeholder="Paste the job posting here…">${esc(a.jobDesc || "")}</textarea></label>
       <label>Notes <textarea id="dNotes" placeholder="Interview dates, impressions…">${esc(a.notes || "")}</textarea></label>
       <label class="check"><input type="checkbox" id="dFollow" ${a.followUpDone ? "checked" : ""}> Follow-up sent</label>
+      <h4 class="tl-head">Activity timeline</h4>
+      <ul class="timeline">${(a.activity || []).slice().reverse().map(x =>
+        `<li><span class="tl-ts">${esc(String(x.ts || "").slice(0, 16).replace("T", " "))}</span> ${esc(x.text)}</li>`).join("") ||
+        `<li class="muted small">No activity yet — stage moves are logged automatically.</li>`}</ul>
+      <div class="form inline">
+        <input id="dNote" placeholder="Add a note — e.g. talked to Sarah, asked for portfolio" aria-label="Add an activity note">
+        <button class="btn small" onclick="addNote()">Add note</button>
+      </div>
       <div class="rowbtns">
         <button class="btn small" onclick="saveDetail()">Save</button>
         <button class="btn small" onclick="useForLetter('${a.id}')">Write cover letter</button>
@@ -143,6 +160,15 @@ function editApp(id) {
     </div>`;
   box.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
+function addNote() {
+  const id = document.getElementById("dId").value;
+  const a = S.apps.find(x => x.id === id); if (!a) return;
+  const note = document.getElementById("dNote").value.trim();
+  if (!note) return;
+  logActivity(a, note);
+  save(S);
+  editApp(id);
+}
 function saveDetail() {
   const id = document.getElementById("dId").value;
   const a = S.apps.find(x => x.id === id); if (!a) return;
@@ -150,6 +176,7 @@ function saveDetail() {
   a.link = document.getElementById("dLink").value.trim();
   a.salary = document.getElementById("dSalary").value.trim();
   a.deadline = document.getElementById("dDeadline").value || "";
+  a.interviewAt = document.getElementById("dInterview").value || "";
   a.jobDesc = document.getElementById("dJobDesc").value;
   a.notes = document.getElementById("dNotes").value;
   a.followUpDone = document.getElementById("dFollow").checked;
@@ -201,12 +228,38 @@ function copyLetter() {
   navigator.clipboard.writeText(t).then(() => alert("Cover letter copied!"));
 }
 
+/* ---------- post-interview thank-you note ---------- */
+function genThanks(e) {
+  e.preventDefault();
+  S.profile.name = document.getElementById("pName").value.trim();
+  save(S);
+  const r = generateThankYou({
+    name: S.profile.name,
+    interviewer: document.getElementById("tInterviewer").value.trim(),
+    company: document.getElementById("tCompany").value.trim(),
+    role: document.getElementById("tRole").value.trim(),
+    tone: document.getElementById("tTone").value,
+    thankyou: THANKYOU
+  });
+  const out = document.getElementById("thanksOut");
+  out.style.display = "block";
+  out.innerHTML = `
+    <pre class="letter">${esc(r.note)}</pre>
+    <button class="btn small" onclick="copyThanks()">Copy thank-you note</button>`;
+  out.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+function copyThanks() {
+  const t = document.querySelector("#thanksOut .letter").innerText;
+  navigator.clipboard.writeText(t).then(() => alert("Thank-you note copied!"));
+}
+
 /* ---------- stats + nudges ---------- */
 function renderStats() {
   const f = funnelStats(S.apps);
   const nudges = followUpNudges(S.apps, FOLLOWUP_AFTER_DAYS, todayISO());
   const perStage = stageStats(S.apps);
   const deadlines = upcomingDeadlines(S.apps, 30, todayISO());
+  const interviews = upcomingInterviews(S.apps, 14);
   const maxStage = Math.max(1, ...STAGES.map(s => perStage[s] || 0));
   const funnel = STAGES.map(s => {
     const n = perStage[s] || 0;
@@ -221,6 +274,11 @@ function renderStats() {
   document.getElementById("statsBox").innerHTML = `
     ${nudges.length ? `<div class="nudge"><b>${nudges.length} follow-up${nudges.length > 1 ? "s" : ""} due:</b><ul>${nudges.slice(0, 5).map(n => `<li>${esc(n.nudge)}</li>`).join("")}</ul></div>` : `<div class="nudge good"><b>Follow-up radar clear.</b> No follow-ups overdue. Nice.</div>`}
     ${deadlineRows}
+    ${interviews.length
+      ? `<div class="funnel card"><h3>Upcoming interviews</h3><ul class="deadlines">${
+          interviews.map(x => `<li class="${x.overdue ? "overdue" : ""}"><b>${esc(x.app.company)}</b> — ${esc(x.app.role)}: <span>${x.overdue ? "overdue" : fmtCountdown(x.hoursLeft)}</span> <em>${esc(String(x.app.interviewAt).replace("T", " "))}</em></li>`).join("")
+        }</ul></div>`
+      : `<div class="funnel card"><h3>Upcoming interviews</h3><p class="muted small">No interviews scheduled. Set one on any application — open Details and pick a date &amp; time.</p></div>`}
     <div class="statcards">
       <div class="stat"><div class="stat-num">${f.total}</div><div class="stat-lab">Applications</div></div>
       <div class="stat"><div class="stat-num">${f.responseRate}%</div><div class="stat-lab">Response rate</div></div>
@@ -241,11 +299,14 @@ document.addEventListener("DOMContentLoaded", () => {
   st.innerHTML = STAGES.map(s => `<option value="${s}">${STAGE_LABELS[s]}</option>`).join("");
   const lt = document.getElementById("lTone");
   lt.innerHTML = Object.entries(TONES).map(([k, v]) => `<option value="${k}">${esc(v.label)}</option>`).join("");
+  const tt = document.getElementById("tTone");
+  if (tt) tt.innerHTML = Object.entries(TONES).map(([k, v]) => `<option value="${k}">${esc(v.label)}</option>`).join("");
   document.getElementById("fDate").value = todayISO();
   document.getElementById("pName").value = S.profile.name || "";
   document.getElementById("pBg").value = S.profile.background || "";
   document.getElementById("addForm").addEventListener("submit", addApp);
   document.getElementById("letterForm").addEventListener("submit", genLetter);
+  document.getElementById("thanksForm").addEventListener("submit", genThanks);
   document.getElementById("boardSearch").addEventListener("input", e => {
     boardQuery = e.target.value;
     renderBoard();

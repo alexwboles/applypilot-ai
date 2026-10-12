@@ -67,10 +67,54 @@ check "searchApps filters by company/role/contact" node -e "
 check "index.html has search, export, deadline controls" node -e "
   const fs=require('fs'), h=fs.readFileSync('index.html','utf8');
   for (const id of ['boardSearch','exportCsv','fDeadline']) if(!h.includes('id=\"'+id+'\"')) throw new Error('missing '+id);
+  for (const id of ['thanksForm','tInterviewer','tCompany','tRole','tTone','thanksOut']) if(!h.includes('id=\"'+id+'\"')) throw new Error('missing '+id);
   const a=fs.readFileSync('js/app.js','utf8');
   if(!a.includes('id=\"dDeadline\"')) throw new Error('missing dDeadline');
+  if(!a.includes('id=\"dInterview\"')) throw new Error('missing dInterview');
   if(!a.includes('upcomingDeadlines(S.apps')) throw new Error('deadlines not rendered');
-  if(!a.includes('searchApps(S.apps, boardQuery)')) throw new Error('search not wired');"
+  if(!a.includes('upcomingInterviews(S.apps')) throw new Error('interviews not rendered');
+  if(!a.includes('searchApps(S.apps, boardQuery)')) throw new Error('search not wired');
+  if(!a.includes('logActivity(a,')) throw new Error('activity not logged');
+  if(!a.includes('generateThankYou(')) throw new Error('thank-you not wired');"
+check "generateThankYou builds a complete note in all 3 tones" node -e "
+  const L=require('./js/logic.js'), B=require('./js/letterbank.js');
+  for (const tone of ['professional','warm','bold']) {
+    const r=L.generateThankYou({name:'Alex',interviewer:'Sarah Kim',company:'Acme',role:'Engineer',tone,thankyou:B.THANKYOU});
+    if(!r.note.includes('Dear Sarah Kim,')) throw new Error(tone+': greeting wrong');
+    if(!r.note.includes('Acme')||!r.note.includes('Engineer')) throw new Error(tone+': fields missing');
+    if(!r.note.includes('Best regards,\nAlex')) throw new Error(tone+': signature missing');
+    if(r.tone!==tone) throw new Error(tone+': tone not reported');
+  }
+  const odd=L.generateThankYou({company:'Acme',role:'PM',tone:'nope',thankyou:B.THANKYOU});
+  if(odd.tone!=='professional') throw new Error('bad tone should fall back to professional');
+  if(!odd.note.startsWith('Hello,')) throw new Error('missing interviewer should use Hello');"
+check "upcomingInterviews sorts soonest-first and flags overdue" node -e "
+  const L=require('./js/logic.js');
+  const now=new Date('2026-10-12T12:00:00').getTime();
+  const apps=[
+    {id:'a',company:'A',interviewAt:'2026-10-13T15:00:00'},
+    {id:'b',company:'B',interviewAt:'2026-10-12T09:00:00'},
+    {id:'c',company:'C',interviewAt:'2026-11-20T10:00:00'},
+    {id:'d',company:'D'}
+  ];
+  const iv=L.upcomingInterviews(apps,14,now);
+  if(iv.length!==2) throw new Error('expected 2 in-window, got '+iv.length);
+  if(iv[0].app.id!=='b'||!iv[0].overdue) throw new Error('overdue should sort first and flag');
+  if(iv[1].app.id!=='a'||iv[1].overdue) throw new Error('future interview wrong');
+  if(Math.abs(iv[1].hoursLeft-27)>0.01) throw new Error('hoursLeft wrong: '+iv[1].hoursLeft);"
+check "fmtCountdown renders human countdowns" node -e "
+  const L=require('./js/logic.js');
+  if(L.fmtCountdown(53)!=='in 2d 5h') throw new Error('days: '+L.fmtCountdown(53));
+  if(L.fmtCountdown(3)!=='in 3h') throw new Error('hours');
+  if(L.fmtCountdown(0.5)!=='in 30m') throw new Error('minutes');
+  if(L.fmtCountdown(-2)!=='overdue') throw new Error('overdue');"
+check "logActivity appends timestamped entries" node -e "
+  const L=require('./js/logic.js');
+  const app={company:'Acme'};
+  L.logActivity(app,'Moved to interviewing','2026-10-12T10:00:00Z');
+  L.logActivity(app,'  ');
+  if(app.activity.length!==1) throw new Error('blank note should be ignored');
+  if(app.activity[0].text!=='Moved to interviewing'||app.activity[0].ts!=='2026-10-12T10:00:00Z') throw new Error('entry wrong');"
 
 echo "--- smoke: $pass passed, $fail failed ---"
 exit $((fail>0))

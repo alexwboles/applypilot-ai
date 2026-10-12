@@ -102,5 +102,36 @@ flow "searchApps narrows the board by any text field" "
   if(L.searchApps(apps,'   ').length!==3) throw new Error('blank = all');
 "
 
+flow "upcomingInterviews end-to-end: schedule, countdown, overdue" "
+  const L=require('./js/logic.js');
+  const now=new Date('2026-10-12T12:00:00').getTime();
+  const apps=[
+    {id:'1',company:'Acme',role:'Eng',stage:'interviewing',interviewAt:'2026-10-14T10:00:00'},
+    {id:'2',company:'Globex',role:'PM',stage:'interviewing',interviewAt:'2026-10-11T09:00:00'},
+    {id:'3',company:'Initech',role:'Dev',stage:'applied'}
+  ];
+  const iv=L.upcomingInterviews(apps,14,now);
+  if(iv.length!==2) throw new Error('count '+iv.length);
+  if(iv[0].app.company!=='Globex'||L.fmtCountdown(iv[0].hoursLeft)!=='overdue') throw new Error('overdue first');
+  if(iv[1].app.company!=='Acme'||L.fmtCountdown(iv[1].hoursLeft)!=='in 1d 22h') throw new Error('countdown: '+L.fmtCountdown(iv[1].hoursLeft));
+"
+
+flow "thank-you note reads naturally end to end" "
+  const L=require('./js/logic.js'), B=require('./js/letterbank.js');
+  const r=L.generateThankYou({name:'Alex Boles',interviewer:'Sarah Kim',company:'Acme',role:'Support Lead',tone:'warm',thankyou:B.THANKYOU});
+  const paras=r.note.split('\n\n');
+  if(paras.length!==5) throw new Error('expected greeting+3 paragraphs+signature, got '+paras.length);
+  if(!r.note.includes('Support Lead')||!r.note.includes('Acme')) throw new Error('role/company missing');
+"
+
+flow "activity timeline accumulates stage moves and notes" "
+  const L=require('./js/logic.js');
+  const app={id:'1',company:'Acme',stage:'applied'};
+  L.logActivity(app,'Moved to interviewing','2026-10-10T09:00:00Z');
+  L.logActivity(app,'Sent thank-you note','2026-10-11T18:00:00Z');
+  if(app.activity.length!==2) throw new Error('count');
+  if(app.activity[1].text!=='Sent thank-you note') throw new Error('order');
+"
+
 echo "--- e2e: $pass passed, $fail failed ---"
 exit $((fail>0))

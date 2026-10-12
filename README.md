@@ -10,7 +10,10 @@ Job hunting falls apart in spreadsheets: you forget who you applied to, cover le
 2. **Applications CSV export** — one click downloads the whole pipeline.
 3. **Deadline tracking** — set a next deadline per application; the stats tab lists upcoming deadlines with overdue highlighting.
 4. **Duplicate application** — clone an entry (lands in wishlist, today's date).
-5. **Days-waiting badges** — cards in "applied" show how many days they've been waiting.
+4. **Days-waiting badges** — cards in "applied" show how many days they've been waiting.
+5. **Interview scheduler** — set an interview date/time per application; cards show a live countdown ("in 2d 5h", overdue in red) and the stats tab lists all upcoming interviews.
+6. **Activity timeline** — every application keeps a timestamped log: stage moves are recorded automatically, and you can add notes ("talked to Sarah, asked for portfolio").
+7. **Thank-you note generator** — post-interview thank-you emails in Professional, Warm, or Bold tone, with copy-to-clipboard.
 1. **Pipeline board** — wishlist → applied → interviewing → offer / rejected, with one-click stage moves
 2. **Application details** — contacts, listing links, salary ranges, notes, and the full job description per application
 3. **Cover letter writer** — paste a job description + your background → tailored letter in Professional, Warm, or Bold tone, with a keyword-match score showing how well you fit
