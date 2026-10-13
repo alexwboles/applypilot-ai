@@ -13,10 +13,25 @@ function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"
 
 let S = load();
 let boardQuery = "";
+const LABEL_TO_STAGE = {};
+Object.entries(STAGE_LABELS).forEach(([slug, label]) => { LABEL_TO_STAGE[label] = slug; });
 function persist() { save(S); render(); }
 function switchTab(name) {
   document.querySelectorAll(".tab").forEach(b => b.classList.toggle("active", b.dataset.tab === name));
   document.querySelectorAll(".panel").forEach(p => p.classList.toggle("active", p.id === "panel-" + name));
+}
+function seedDemo() {
+  if ((S.apps || []).length && !confirm("Replace your current board with the demo board?")) return;
+  S.apps = demoBoard();
+  persist();
+  switchTab("board");
+}
+function renderRail() {
+  const box = document.getElementById("railStats");
+  if (!box) return;
+  const counts = stageStats(S.apps || []);
+  box.innerHTML = STAGES.map(s =>
+    `<div class="rail-row"><span>${STAGE_LABELS[s]}</span><b>${counts[s] || 0}</b></div>`).join("");
 }
 
 /* ---------- pipeline board ---------- */
@@ -32,10 +47,14 @@ function renderBoard() {
   const visible = searchApps(S.apps, boardQuery);
   const ivById = {};
   upcomingInterviews(S.apps, 14).forEach(x => { ivById[x.app.id] = x; });
+  const dueById = {};
+  followUpNudges(S.apps, FOLLOWUP_AFTER_DAYS, todayISO()).forEach(n => { dueById[n.app.id] = true; });
+  const durations = stageDurations(S.apps, todayISO(), LABEL_TO_STAGE);
   box.innerHTML = STAGES.map(st => {
     const list = visible.filter(a => a.stage === st);
     const total = (S.apps || []).filter(a => a.stage === st).length;
     const countLabel = boardQuery ? `${list.length} of ${total}` : `${total}`;
+    const avg = durations[st] != null ? `avg ${durations[st]}d in stage` : "avg — in stage";
     return `<div class="col" data-stage="${st}">
       <h3><span class="stage-ic">${STAGE_ICONS[st] || ""}</span>${STAGE_LABELS[st]} <span class="count">${countLabel}</span></h3>
       ${list.map(a => {
@@ -47,8 +66,11 @@ function renderBoard() {
         const iv = ivById[a.id];
         const ivBadge = iv
           ? ` · <span class="due${iv.overdue ? " overdue" : ""}">interview ${esc(fmtCountdown(iv.hoursLeft))}</span>` : "";
+        const followBadge = dueById[a.id] ? ` · <span class="follow-badge">follow-up due</span>` : "";
+        const ticket = String(a.id || "").replace(/[^a-z0-9]/gi, "").slice(-4).toUpperCase() || "0000";
         return `
         <div class="acard">
+          <span class="ticket-no">№ ${ticket}</span>
           <div class="strip-main">
             <span class="avatar" aria-hidden="true">${initial}</span>
             <div class="strip-id">
@@ -56,13 +78,17 @@ function renderBoard() {
               <div class="muted small">${esc(a.role)}</div>
             </div>
           </div>
-          <div class="strip-meta muted small">Applied ${esc(a.dateApplied || "—")}${waiting}${due}${ivBadge}${a.salary ? ` · ${esc(a.salary)}` : ""}</div>
+          <div class="strip-meta muted small">Applied ${esc(a.dateApplied || "—")}${waiting}${due}${ivBadge}${followBadge}${a.salary ? ` · ${esc(a.salary)}` : ""}</div>
           <div class="rowbtns">
             ${STAGES.filter(s => s !== a.stage).map(s =>
               `<button class="btn tiny" onclick="moveApp('${a.id}','${s}')" title="Move to ${STAGE_LABELS[s]}">→ ${STAGE_LABELS[s]}</button>`).join("")}
           </div>
-          <button class="btn tiny ghost" onclick="editApp('${a.id}')">Details</button>
-        </div>`; }).join("") || `<p class="muted small col-empty">${boardQuery ? "No matches for this search." : "No applications here yet."}</p>`}
+          <div class="card-foot">
+            <button class="btn tiny ghost" onclick="editApp('${a.id}')">Details</button>
+            <span class="ticket-no">№ ${ticket}</span>
+          </div>
+        </div>`; }).join("") || `<p class="muted small col-empty">${boardQuery ? "No matches for this search." : "No applications here yet — file one above, or load the demo board to explore."}</p>`}
+      <div class="col-foot"><span>${avg}</span><span>${STAGE_LABELS[st]}</span></div>
     </div>`;
   }).join("");
 }
@@ -271,9 +297,7 @@ function renderStats() {
   const interviews = upcomingInterviews(S.apps, 14);
   const weeklyTarget = Math.max(0, parseInt(S.profile.weeklyTarget, 10) || 0);
   const wk = weekStats(S.apps, weeklyTarget, todayISO());
-  const labelToStage = {};
-  Object.entries(STAGE_LABELS).forEach(([slug, label]) => { labelToStage[label] = slug; });
-  const durations = stageDurations(S.apps, todayISO(), labelToStage);
+  const durations = stageDurations(S.apps, todayISO(), LABEL_TO_STAGE);
   const offers = offerStats(S.apps);
   const maxStage = Math.max(1, ...STAGES.map(s => perStage[s] || 0));
   const funnel = STAGES.map(s => {
@@ -330,6 +354,7 @@ function renderStats() {
 function render() {
   renderBoard();
   renderStats();
+  renderRail();
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -350,6 +375,7 @@ document.addEventListener("DOMContentLoaded", () => {
     renderBoard();
   });
   document.getElementById("exportCsv").addEventListener("click", exportCsv);
+  document.getElementById("seedDemo").addEventListener("click", seedDemo);
   document.querySelectorAll(".tab").forEach(b => b.addEventListener("click", () => switchTab(b.dataset.tab)));
   render();
 });

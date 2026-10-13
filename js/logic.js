@@ -319,6 +319,36 @@ if (typeof module !== "undefined" && module.exports) {
   module.exports = { parseISO, toISO, todayISO, daysBetween, stageStats, funnelStats,
     followUpNudges, extractKeywords, matchScore, generateCoverLetter,
     generateThankYou, upcomingInterviews, fmtCountdown, logActivity,
-    upcomingDeadlines, appsToCSV, searchApps,
+    upcomingDeadlines, appsToCSV, searchApps, demoBoard,
     parseSalary, offerStats, weekStats, stageDurations };
+}
+
+/* Demo board seed — one click loads a realistic sample pipeline. */
+function demoBoard() {
+  const daysAgo = n => toISO(new Date(Date.now() - n * 864e5));
+  const mk = (company, role, stage, appliedDaysAgo, opts) => {
+    const app = Object.assign({
+      id: "demo-" + String(company).toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 8),
+      company, role, stage,
+      dateApplied: daysAgo(appliedDaysAgo),
+      deadline: "", contact: "", link: "", salary: "",
+      notes: "", jobDesc: "", followUpDone: false, interviewAt: "", activity: []
+    }, opts || {});
+    logActivity(app, "Moved to " + stage, daysAgo(appliedDaysAgo) + "T09:00:00");
+    return app;
+  };
+  return [
+    mk("Northwind Retail", "Senior Customer Support Lead", "applied", 9, {
+      salary: "$88k–$102k", contact: "Priya Nair",
+      notes: "Met the team at a virtual info session; asked about escalation workflow." }),
+    mk("Bluefin Logistics", "Operations Analyst", "applied", 12, { salary: "$95k–$110k" }),
+    mk("Harbor & Finch", "Support Engineer", "interviewing", 16, {
+      contact: "Marcus Webb",
+      interviewAt: toISO(new Date(Date.now() + 2 * 864e5)).slice(0, 16),
+      notes: "Round 2 — system design chat with the platform team." }),
+    mk("Copperline Foods", "Line Supervisor", "wishlist", 0, { notes: "Posting closes Friday — tailor letter with food-safety keywords." }),
+    mk("Aster Analytics", "Data QA Specialist", "offer", 21, {
+      salary: "$105k–$118k", notes: "Offer letter received — deciding by end of week." }),
+    mk("Vantage Telecom", "Field Technician", "rejected", 30, { notes: "No response after final round — asked for feedback, none received." })
+  ];
 }

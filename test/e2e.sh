@@ -170,5 +170,14 @@ flow "time-in-stage from a realistic timeline" "
   if(d.offer!==8) throw new Error('offer='+d.offer);
 "
 
+flow "demo board seeds follow-up-nudge-eligible applied apps" "
+  const L=require('./js/logic.js');
+  const apps=L.demoBoard();
+  const n=L.followUpNudges(apps,7,L.todayISO());
+  if(n.length!==2) throw new Error('expected 2 nudges (9d + 12d old applied apps), got '+n.length);
+  const d=L.stageDurations(apps,L.todayISO(),{wishlist:'wishlist',applied:'applied',interviewing:'interviewing',offer:'offer',rejected:'rejected'});
+  if(Object.keys(d).length===0) throw new Error('durations should be computable from demo timelines');
+"
+
 echo "--- e2e: $pass passed, $fail failed ---"
 exit $((fail>0))

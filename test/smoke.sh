@@ -171,9 +171,26 @@ check "CSV carries salary_mid column" node -e "
   const lines=csv.split('\n');
   if(!lines[0].includes('salary_mid')) throw new Error('header: '+lines[0]);
   if(!lines[1].includes(',100000,')) throw new Error('mid missing: '+lines[1]);"
-check "stats panel wires cadence, durations, salary widgets" node -e "
+check "demoBoard seeds 6 realistic multi-stage applications" node -e "
+  const L=require('./js/logic.js');
+  const apps=L.demoBoard();
+  if(apps.length!==6) throw new Error('count='+apps.length);
+  const stages=new Set(apps.map(a=>a.stage));
+  for (const s of ['wishlist','applied','interviewing','offer','rejected']) if(!stages.has(s)) throw new Error('missing '+s);
+  const ids=new Set(apps.map(a=>a.id));
+  if(ids.size!==6) throw new Error('ids not unique');
+  for (const a of apps) { if(!a.activity||!a.activity.length) throw new Error('no activity for '+a.company); }
+  if(typeof L.demoBoard!=='function') throw new Error('not exported');"
+check "redesign: rail stats, demo seed, boarding-pass wiring present" node -e "
+  const h=require('fs').readFileSync('index.html','utf8');
+  for (const id of ['railStats','seedDemo']) if(!h.includes('id=\"'+id+'\"')) throw new Error('missing '+id);
+  if(!h.includes('class=\"shell\"')||!h.includes('kicker')) throw new Error('shell/kicker missing');
   const a=require('fs').readFileSync('js/app.js','utf8');
-  for (const s of ['weekStats','stageDurations','offerStats','weeklyTarget','durations','moneyK','Avg offer','Weekly cadence','Avg days per stage']) if(!a.includes(s)) throw new Error('missing '+s);"
+  for (const s of ['renderRail','demoBoard()','ticket-no','col-foot','follow-badge','LABEL_TO_STAGE']) if(!a.includes(s)) throw new Error('missing '+s);
+  const css=require('fs').readFileSync('css/style.css','utf8');
+  // no rounded corners anywhere; true circles (50%) are fine (status dot)
+  if(/border-radius:\s*(?!50%)[1-9]/.test(css.replace(/border-radius:\s*50%/g,''))) throw new Error('rounded edges found');
+  for (const s of ['.shell','.rail-stats','.col-foot','.ticket-no','.follow-badge']) if(!css.includes(s)) throw new Error('css missing '+s);"
 
 echo "--- smoke: $pass passed, $fail failed ---"
 exit $((fail>0))
