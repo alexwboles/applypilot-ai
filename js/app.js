@@ -80,7 +80,7 @@ function delApp() {
 }
 function dupApp(id) {
   const a = S.apps.find(x => x.id === id); if (!a) return;
-  S.apps.push({
+  const copy = {
     id: uid(),
     company: a.company, role: a.role,
     stage: "wishlist",
@@ -89,7 +89,10 @@ function dupApp(id) {
     contact: a.contact || "", link: a.link || "", salary: a.salary || "",
     notes: a.notes || "", jobDesc: a.jobDesc || "", followUpDone: false,
     interviewAt: "", activity: []
-  });
+  };
+  logActivity(copy, "Moved to " + (STAGE_LABELS.wishlist || "wishlist"));
+  logActivity(copy, "Duplicated from " + (a.company || "another application"));
+  S.apps.push(copy);
   document.getElementById("detailBox").style.display = "none";
   persist();
 }
@@ -111,9 +114,10 @@ function addApp(e) {
   const company = document.getElementById("fCompany").value.trim();
   const role = document.getElementById("fRole").value.trim();
   if (!company || !role) return;
-  S.apps.push({
+  const stage = document.getElementById("fStage").value;
+  const app = {
     id: uid(), company, role,
-    stage: document.getElementById("fStage").value,
+    stage,
     dateApplied: document.getElementById("fDate").value || todayISO(),
     deadline: document.getElementById("fDeadline").value || "",
     contact: document.getElementById("fContact").value.trim(),
@@ -121,7 +125,9 @@ function addApp(e) {
     salary: document.getElementById("fSalary").value.trim(),
     notes: document.getElementById("fNotes").value.trim(),
     jobDesc: "", followUpDone: false, interviewAt: "", activity: []
-  });
+  };
+  logActivity(app, "Moved to " + (STAGE_LABELS[stage] || stage));
+  S.apps.push(app);
   e.target.reset();
   document.getElementById("fDate").value = todayISO();
   persist();
@@ -254,12 +260,21 @@ function copyThanks() {
 }
 
 /* ---------- stats + nudges ---------- */
+function moneyK(n) {
+  return n >= 1000 ? "$" + Math.round(n / 1000) + "k" : "$" + n;
+}
 function renderStats() {
   const f = funnelStats(S.apps);
   const nudges = followUpNudges(S.apps, FOLLOWUP_AFTER_DAYS, todayISO());
   const perStage = stageStats(S.apps);
   const deadlines = upcomingDeadlines(S.apps, 30, todayISO());
   const interviews = upcomingInterviews(S.apps, 14);
+  const weeklyTarget = Math.max(0, parseInt(S.profile.weeklyTarget, 10) || 0);
+  const wk = weekStats(S.apps, weeklyTarget, todayISO());
+  const labelToStage = {};
+  Object.entries(STAGE_LABELS).forEach(([slug, label]) => { labelToStage[label] = slug; });
+  const durations = stageDurations(S.apps, todayISO(), labelToStage);
+  const offers = offerStats(S.apps);
   const maxStage = Math.max(1, ...STAGES.map(s => perStage[s] || 0));
   const funnel = STAGES.map(s => {
     const n = perStage[s] || 0;
@@ -284,9 +299,32 @@ function renderStats() {
       <div class="stat"><div class="stat-num">${f.responseRate}%</div><div class="stat-lab">Response rate</div></div>
       <div class="stat"><div class="stat-num">${f.offers}</div><div class="stat-lab">Offers</div></div>
       <div class="stat"><div class="stat-num">${f.rejected}</div><div class="stat-lab">Rejections</div></div>
+      ${offers.count ? `<div class="stat"><div class="stat-num">${moneyK(offers.avgMid)}</div><div class="stat-lab">Avg offer (${offers.count})</div></div>` : ""}
     </div>
+    <div class="funnel card"><h3>Weekly cadence</h3>
+      <div class="cad-row">
+        <div class="funnel-track"><i class="funnel-fill st-applied" style="width:${wk.pct}%"></i></div>
+        <b class="funnel-num">${wk.count}${weeklyTarget ? " / " + weeklyTarget : ""}</b>
+      </div>
+      <p class="muted small">${weeklyTarget
+        ? (wk.met ? "Target hit — keep the momentum." : `${weeklyTarget - wk.count} more to hit this week's target.`)
+        : "Set a weekly application target to track your cadence."}</p>
+      <label class="muted small">Weekly target
+        <input type="number" id="weeklyTarget" min="0" max="99" value="${weeklyTarget || ""}" placeholder="e.g. 5" aria-label="Weekly application target">
+      </label>
+    </div>
+    ${Object.keys(durations).length ? `<div class="funnel card"><h3>Avg days per stage</h3>
+      <ul class="durations">${STAGES.filter(s => durations[s] != null).map(s =>
+        `<li><span>${STAGE_LABELS[s]}</span><b>${durations[s]}d</b></li>`).join("")}</ul>
+      <p class="muted small">From your activity timeline — stage moves are logged automatically.</p>
+    </div>` : ""}
     <div class="funnel card"><h3>Pipeline funnel</h3>${funnel}</div>
     <p class="tip">Response rate = interviewing + offers ÷ everything you've actually applied to. Aim for 10–20%.</p>`;
+  const wt = document.getElementById("weeklyTarget");
+  if (wt) wt.addEventListener("change", () => {
+    S.profile.weeklyTarget = Math.max(0, parseInt(wt.value, 10) || 0);
+    save(S); renderStats();
+  });
 }
 
 function render() {

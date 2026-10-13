@@ -133,5 +133,42 @@ flow "activity timeline accumulates stage moves and notes" "
   if(app.activity[1].text!=='Sent thank-you note') throw new Error('order');
 "
 
+flow "offer salary stats across the pipeline" "
+  const L=require('./js/logic.js');
+  const apps=[
+    {stage:'offer',salary:'\$90k–\$110k'},
+    {stage:'offer',salary:'\$45/hr'},
+    {stage:'rejected',salary:'\$300k'}
+  ];
+  const o=L.offerStats(apps);
+  if(o.count!==2) throw new Error('count='+o.count);
+  // (100000 + 93600) / 2 = 96800
+  if(o.avgMid!==96800) throw new Error('avg='+o.avgMid);
+  if(L.offerStats([{stage:'applied'}]).count!==0) throw new Error('no offers');
+"
+
+flow "weekly cadence target progress" "
+  const L=require('./js/logic.js');
+  const apps=[{dateApplied:'2026-10-12'},{dateApplied:'2026-10-08'},{dateApplied:'2026-09-20'}];
+  const w=L.weekStats(apps,4,'2026-10-13');
+  if(w.count!==2||w.pct!==50||w.met) throw new Error(JSON.stringify(w));
+  if(!L.weekStats(apps,2,'2026-10-13').met) throw new Error('2/2 met');
+"
+
+flow "time-in-stage from a realistic timeline" "
+  const L=require('./js/logic.js');
+  const map={Wishlist:'wishlist',Applied:'applied',Interviewing:'interviewing',Offer:'offer'};
+  const mk=(moves)=>({activity:moves.map(m=>({ts:m[0],text:'Moved to '+m[1]}))});
+  const apps=[
+    mk([['2026-09-20T09:00','Wishlist'],['2026-09-22T09:00','Applied'],['2026-09-30T09:00','Interviewing'],['2026-10-05T09:00','Offer']]),
+    mk([['2026-10-01T09:00','Applied'],['2026-10-11T09:00','Interviewing']])
+  ];
+  const d=L.stageDurations(apps,'2026-10-13',map);
+  if(d.wishlist!==2) throw new Error('wishlist='+d.wishlist);
+  if(d.applied!==9) throw new Error('applied='+d.applied);
+  if(d.interviewing!==3.5) throw new Error('interviewing='+d.interviewing);
+  if(d.offer!==8) throw new Error('offer='+d.offer);
+"
+
 echo "--- e2e: $pass passed, $fail failed ---"
 exit $((fail>0))

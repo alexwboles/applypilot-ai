@@ -14,6 +14,9 @@ Job hunting falls apart in spreadsheets: you forget who you applied to, cover le
 5. **Interview scheduler** — set an interview date/time per application; cards show a live countdown ("in 2d 5h", overdue in red) and the stats tab lists all upcoming interviews.
 6. **Activity timeline** — every application keeps a timestamped log: stage moves are recorded automatically, and you can add notes ("talked to Sarah, asked for portfolio").
 7. **Thank-you note generator** — post-interview thank-you emails in Professional, Warm, or Bold tone, with copy-to-clipboard.
+8. **Weekly cadence tracker** — set a weekly application target; the stats tab shows this week's progress (applications dated in the last 7 days) with a progress bar.
+9. **Time-in-stage analytics** — average days applications spend in each pipeline stage, computed from the activity timeline's stage moves.
+10. **Salary insights** — offer-stage salary ranges parsed ("$90k–$110k", "$95/hr") into annual midpoints; average offer shown in the stats tab and a salary-midpoint column added to the CSV export.
 1. **Pipeline board** — wishlist → applied → interviewing → offer / rejected, with one-click stage moves
 2. **Application details** — contacts, listing links, salary ranges, notes, and the full job description per application
 3. **Cover letter writer** — paste a job description + your background → tailored letter in Professional, Warm, or Bold tone, with a keyword-match score showing how well you fit

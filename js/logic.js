@@ -186,6 +186,106 @@ function logActivity(app, text, tsISO) {
   return app;
 }
 
+/**
+ * Parse a salary range string into { min, max, mid } (annual USD).
+ * Handles "$90k–$110k", "$90k-$110k", "$120,000", "95000", "$95/hr" (hourly × 2080).
+ * Returns null when nothing parseable is found.
+ */
+function parseSalary(text) {
+  const s = String(text || "").toLowerCase().replace(/,/g, "");
+  const hourly = /\/\s*(hr|hour)/.test(s);
+  const vals = (s.match(/\d+(?:\.\d+)?\s*k?/g) || [])
+    .map(m => {
+      const k = /k\s*$/.test(m);
+      const n = parseFloat(m);
+      if (!n || n <= 0) return 0;
+      return k ? n * 1000 : n;
+    })
+    .filter(n => n > 0);
+  if (!vals.length) return null;
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const factor = hourly ? 2080 : 1;
+  return {
+    min: Math.round(min * factor),
+    max: Math.round(max * factor),
+    mid: Math.round(((min + max) / 2) * factor),
+    hourly
+  };
+}
+
+/**
+ * Salary stats over offer-stage applications with parseable salary ranges.
+ * Returns { count, avgMid, min, max } — all 0 when no data.
+ */
+function offerStats(apps) {
+  const mids = (apps || [])
+    .filter(a => a.stage === "offer")
+    .map(a => parseSalary(a.salary))
+    .filter(Boolean)
+    .map(s => s.mid);
+  if (!mids.length) return { count: 0, avgMid: 0, min: 0, max: 0 };
+  return {
+    count: mids.length,
+    avgMid: Math.round(mids.reduce((s, n) => s + n, 0) / mids.length),
+    min: Math.min(...mids),
+    max: Math.max(...mids)
+  };
+}
+
+/**
+ * Weekly application cadence: applications dated within the last 7 days
+ * (inclusive) against a weekly target.
+ * Returns { count, target, pct, met }.
+ */
+function weekStats(apps, target, fromISO) {
+  const now = fromISO || todayISO();
+  const weekAgo = toISO(new Date(parseISO(now).getTime() - 6 * 86400000));
+  const count = (apps || []).filter(a =>
+    a.dateApplied && a.dateApplied >= weekAgo && a.dateApplied <= now).length;
+  const t = Math.max(0, target || 0);
+  return {
+    count,
+    target: t,
+    pct: t ? Math.min(100, Math.round((count / t) * 100)) : 0,
+    met: t > 0 && count >= t
+  };
+}
+
+/**
+ * Average days applications spend in each pipeline stage, derived from the
+ * "Moved to <label>" entries in activity timelines: time in a stage runs from
+ * its move-in day to the next move (or today for the current stage).
+ * labelToStage maps display labels back to stage slugs (defaults to lowercase).
+ * Returns { <stage>: avgDays }.
+ */
+function stageDurations(apps, fromISO, labelToStage) {
+  const now = fromISO || todayISO();
+  const map = labelToStage || {};
+  const slug = label => {
+    const l = String(label || "").trim();
+    return map[l] || l.toLowerCase();
+  };
+  const totals = {}, counts = {};
+  (apps || []).forEach(a => {
+    const events = [];
+    (a.activity || []).forEach(x => {
+      const m = /^Moved to (.+)$/.exec(String(x.text || "").trim());
+      const day = String(x.ts || "").slice(0, 10);
+      if (m && /^\d{4}-\d{2}-\d{2}$/.test(day)) events.push({ day, stage: slug(m[1]) });
+    });
+    events.sort((x, y) => (x.day < y.day ? -1 : x.day > y.day ? 1 : 0));
+    for (let i = 0; i < events.length; i++) {
+      const end = i + 1 < events.length ? events[i + 1].day : now;
+      const days = Math.max(0, daysBetween(events[i].day, end));
+      totals[events[i].stage] = (totals[events[i].stage] || 0) + days;
+      counts[events[i].stage] = (counts[events[i].stage] || 0) + 1;
+    }
+  });
+  const avg = {};
+  Object.keys(totals).forEach(s => { avg[s] = Math.round((totals[s] / counts[s]) * 10) / 10; });
+  return avg;
+}
+
 function csvCell(v) {
   const s = String(v == null ? "" : v).replace(/\r?\n/g, " ");
   return /[",]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
@@ -194,12 +294,13 @@ function csvCell(v) {
 /** Export the pipeline as CSV: one row per application. */
 function appsToCSV(apps) {
   const rows = [["company", "role", "stage", "date_applied", "deadline",
-    "contact", "link", "salary", "follow_up_sent", "notes"]];
+    "contact", "link", "salary", "salary_mid", "follow_up_sent", "notes"]];
   (apps || []).forEach(a => {
+    const sal = parseSalary(a.salary);
     rows.push([
       a.company || "", a.role || "", a.stage || "", a.dateApplied || "",
       a.deadline || "", a.contact || "", a.link || "", a.salary || "",
-      a.followUpDone ? "yes" : "no", a.notes || ""
+      sal ? String(sal.mid) : "", a.followUpDone ? "yes" : "no", a.notes || ""
     ]);
   });
   return rows.map(r => r.map(csvCell).join(",")).join("\n");
@@ -218,5 +319,6 @@ if (typeof module !== "undefined" && module.exports) {
   module.exports = { parseISO, toISO, todayISO, daysBetween, stageStats, funnelStats,
     followUpNudges, extractKeywords, matchScore, generateCoverLetter,
     generateThankYou, upcomingInterviews, fmtCountdown, logActivity,
-    upcomingDeadlines, appsToCSV, searchApps };
+    upcomingDeadlines, appsToCSV, searchApps,
+    parseSalary, offerStats, weekStats, stageDurations };
 }

@@ -115,6 +115,65 @@ check "logActivity appends timestamped entries" node -e "
   L.logActivity(app,'  ');
   if(app.activity.length!==1) throw new Error('blank note should be ignored');
   if(app.activity[0].text!=='Moved to interviewing'||app.activity[0].ts!=='2026-10-12T10:00:00Z') throw new Error('entry wrong');"
+check "parseSalary parses ranges, singles, hourly rates" node -e "
+  const L=require('./js/logic.js');
+  const r=L.parseSalary('\$90k–\$110k');
+  if(!r||r.min!==90000||r.max!==110000||r.mid!==100000) throw new Error('range: '+JSON.stringify(r));
+  const s=L.parseSalary('\$120,000');
+  if(!s||s.mid!==120000) throw new Error('single: '+JSON.stringify(s));
+  const h=L.parseSalary('\$95/hr');
+  if(!h||h.mid!==197600||!h.hourly) throw new Error('hourly: '+JSON.stringify(h));
+  if(L.parseSalary('competitive')!==null) throw new Error('garbage should be null');
+  if(L.parseSalary('')!==null) throw new Error('empty should be null');"
+check "offerStats averages offer-stage midpoints" node -e "
+  const L=require('./js/logic.js');
+  const apps=[
+    {stage:'offer',salary:'\$90k–\$110k'},
+    {stage:'offer',salary:'\$120k'},
+    {stage:'offer',salary:'competitive'},
+    {stage:'applied',salary:'\$200k'}];
+  const o=L.offerStats(apps);
+  if(o.count!==2) throw new Error('count='+o.count);
+  if(o.avgMid!==110000) throw new Error('avg='+o.avgMid);
+  if(o.min!==100000||o.max!==120000) throw new Error('min/max');"
+check "weekStats counts last-7-day applications vs target" node -e "
+  const L=require('./js/logic.js');
+  const apps=[
+    {dateApplied:'2026-10-13'},{dateApplied:'2026-10-10'},{dateApplied:'2026-10-07'},
+    {dateApplied:'2026-10-06'},{dateApplied:'2026-09-01'}];
+  const w=L.weekStats(apps,5,'2026-10-13');
+  if(w.count!==3) throw new Error('count='+w.count);
+  if(w.pct!==60) throw new Error('pct='+w.pct);
+  if(w.met) throw new Error('should not be met');
+  const w2=L.weekStats(apps,3,'2026-10-13');
+  if(!w2.met) throw new Error('3/3 should be met');
+  const w0=L.weekStats(apps,0,'2026-10-13');
+  if(w0.pct!==0||w0.met) throw new Error('zero target');"
+check "stageDurations averages days per stage from the timeline" node -e "
+  const L=require('./js/logic.js');
+  const map={'Wishlist':'wishlist','Applied':'applied','Interviewing':'interviewing'};
+  const apps=[{
+    activity:[
+      {ts:'2026-10-01T09:00:00',text:'Moved to Wishlist'},
+      {ts:'2026-10-03T09:00:00',text:'Moved to Applied'},
+      {ts:'2026-10-08T09:00:00',text:'Moved to Interviewing'},
+      {ts:'2026-10-09T09:00:00',text:'Called Sarah — went well'}
+    ]}];
+  const d=L.stageDurations(apps,'2026-10-13',map);
+  if(d.wishlist!==2) throw new Error('wishlist='+d.wishlist);
+  if(d.applied!==5) throw new Error('applied='+d.applied);
+  if(d.interviewing!==5) throw new Error('interviewing='+d.interviewing);
+  const empty=L.stageDurations([{activity:[]}],'2026-10-13',map);
+  if(Object.keys(empty).length!==0) throw new Error('should be empty');"
+check "CSV carries salary_mid column" node -e "
+  const L=require('./js/logic.js');
+  const csv=L.appsToCSV([{company:'Acme',role:'Eng',stage:'offer',dateApplied:'2026-10-01',deadline:'',contact:'',link:'',salary:'\$100k',followUpDone:false,notes:''}]);
+  const lines=csv.split('\n');
+  if(!lines[0].includes('salary_mid')) throw new Error('header: '+lines[0]);
+  if(!lines[1].includes(',100000,')) throw new Error('mid missing: '+lines[1]);"
+check "stats panel wires cadence, durations, salary widgets" node -e "
+  const a=require('fs').readFileSync('js/app.js','utf8');
+  for (const s of ['weekStats','stageDurations','offerStats','weeklyTarget','durations','moneyK','Avg offer','Weekly cadence','Avg days per stage']) if(!a.includes(s)) throw new Error('missing '+s);"
 
 echo "--- smoke: $pass passed, $fail failed ---"
 exit $((fail>0))
