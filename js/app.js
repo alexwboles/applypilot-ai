@@ -7,7 +7,7 @@ function load() {
   catch (e) { return blank(); }
 }
 function blank() { return { apps: [], profile: { name: "", background: "" } }; }
-function save(s) { localStorage.setItem(LS_KEY, JSON.stringify(s)); }
+function save(s) { try { localStorage.setItem(LS_KEY, JSON.stringify(s)); } catch (e) { /* storage blocked/full: non-fatal */ } }
 function uid() { return "a" + Date.now().toString(36) + Math.floor(Math.random() * 999); }
 function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 
